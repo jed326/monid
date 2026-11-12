@@ -277,9 +277,45 @@ Deno.test({
     name: "tako#v3/search live (gated on TAKO_API_KEY)",
     ignore: liveSkip("tako"),
     fn: async () => {
+        const unit = await testSealedUnit(ID);
+        const input = {
+            body: {
+                query: "US unemployment rate",
+                sources: { data: { include_contents: true, max_rows: 5 } },
+            },
+        };
+        const hold = await estimateEndpoint(unit, input);
+        const result = await runEndpoint({ unit, input, mode: "live" });
+
+        assertEquals(
+            result.isProviderError,
+            false,
+            JSON.stringify(result.output),
+        );
+        const settled = result.usage.credits.default;
+        assert(
+            typeof settled === "number" && settled <= hold.credits.default,
+            `settled ${settled} above the hold ${hold.credits.default}`,
+        );
+        assert(!("usage" in (result.output as Record<string, unknown>)));
+    },
+});
+
+Deno.test({
+    name:
+        "tako#v3/search live card prices fit the rates the hold assumes (gated on TAKO_API_KEY)",
+    ignore: liveSkip("tako"),
+    fn: async () => {
+        const heldRowCpmUsd = 1.6;
+        const heldCardBaselineUsd = 0.001;
         const result = await runEndpoint({
             unit: await testSealedUnit(ID),
-            input: { body: { query: "US unemployment rate" } },
+            input: {
+                body: {
+                    query: "Stripe headcount and website traffic",
+                    sources: { data: { count: 20 } },
+                },
+            },
             mode: "live",
         });
 
@@ -288,7 +324,28 @@ Deno.test({
             false,
             JSON.stringify(result.output),
         );
-        assertEquals(typeof result.usage.credits.default, "number");
-        assert(!("usage" in (result.output as Record<string, unknown>)));
+        const cards = (result.output as { cards?: Json[] }).cards ?? [];
+        const prices = cards.flatMap((card) => {
+            const pricing = (card as {
+                content?: {
+                    export_pricing?: {
+                        baseline_usd: number;
+                        row_cpm_usd: number;
+                    };
+                };
+            }).content?.export_pricing;
+            return pricing === undefined ? [] : [pricing];
+        });
+        assert(prices.length > 0, "no card carried export_pricing");
+        for (const price of prices) {
+            assert(
+                price.row_cpm_usd <= heldRowCpmUsd,
+                `row rate ${price.row_cpm_usd} per 1,000 above the held ${heldRowCpmUsd}`,
+            );
+            assert(
+                price.baseline_usd <= heldCardBaselineUsd,
+                `card baseline ${price.baseline_usd} above the held ${heldCardBaselineUsd}`,
+            );
+        }
     },
 });

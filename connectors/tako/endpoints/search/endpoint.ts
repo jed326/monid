@@ -25,8 +25,9 @@ const zDataSourceBinding = zDataSourceSettings.omit({ variable_cost: true })
                     "as website traffic and SEO data, in USD. Defaults to " +
                     "0.25. A card whose price doesn't fit in what's left of " +
                     "the cap comes back as a placeholder with " +
-                    "placeholder.reason 'over_cap'. Send 0 to leave out " +
-                    "website traffic data.",
+                    "placeholder.reason 'over_cap'. Send 0 to pay nothing " +
+                    "above the base price: Tako then serves data only for " +
+                    "the cards whose minimum price the base price covers.",
             ),
     });
 
