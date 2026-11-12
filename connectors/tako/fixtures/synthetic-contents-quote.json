@@ -1,0 +1,34 @@
+{
+    "name": "synthetic-contents-quote",
+    "description": "Synthetic /v1/contents 200 for a quote_only request, shaped from Tako's public ContentsResponse schema: the item carries the price and no content, and usage reports $0.",
+    "calls": [
+        {
+            "req": {
+                "method": "POST",
+                "url": "{{request.url}}"
+            },
+            "res": {
+                "status": 200,
+                "body": {
+                    "request_id": "req_synthetic_contents_2",
+                    "contents": [
+                        {
+                            "source_url": "https://tako.com/card/def456",
+                            "delivery": "quote",
+                            "cost": 0.00202,
+                            "export_pricing": {
+                                "baseline_usd": 0.001,
+                                "row_cpm_usd": 0.01,
+                                "max_rows_ceiling": 100000
+                            }
+                        }
+                    ],
+                    "usage": {
+                        "total_cost_usd": 0,
+                        "data": { "cost_usd": 0, "datasets": 0 }
+                    }
+                }
+            }
+        }
+    ]
+}
