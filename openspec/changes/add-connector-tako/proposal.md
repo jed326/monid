@@ -41,8 +41,8 @@ markets. No connector in the catalog searches structured statistics.
     each, plus `count × max_rows` rows, at most Tako's 2,000-row
     response budget plus a 20-row floor per card, at $1.60 per 1,000.
     Tako bills a card's rows at the sum of its paid feeds' rates, and
-    $1.60 is the sum of all of them: People Data Labs at $1.50 and
-    Fiscal.ai at $0.10. Inlined rows never bill premium rates.
+    $1.60 is the sum of all of them, the most Tako bills for one row.
+    Inlined rows never bill premium rates.
   - Contents: `max_cost_usd`, required at the binding, at least the
     $0.001 base price. Tako prices the call before it reads any data
     and returns an unbilled 422 `COST_CAP_EXCEEDED` when the price is
