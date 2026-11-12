@@ -652,7 +652,6 @@
         "suzanne#v1/models/download",
         "suzanne#v1/uploads",
         "tako#v1/contents",
-        "tako#v1/contents/quote",
         "tako#v3/search",
         "tinyfish#fetch",
         "tinyfish#search"

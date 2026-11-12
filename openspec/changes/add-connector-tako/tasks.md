@@ -14,7 +14,6 @@
       removed, `call` + `metered` model, estimate and evidence
 - [x] 2.2 `tako#v1/contents`: `max_cost_usd` required, `quote_only` and
       `zdr` removed, `call` + `metered` model
-- [x] 2.3 `tako#v1/contents/quote`: `FREE`, sends `quote_only: true`
 
 ## 3. Fixtures and tests
 
@@ -23,7 +22,6 @@
       gates, 401 and 422 as zero-billed data, live gated on
       `TAKO_API_KEY`
 - [ ] 3.3 Replace the synthetic fixtures with `deno task record` runs
-      when a Tako key is available
 
 ## 4. Wiring
 

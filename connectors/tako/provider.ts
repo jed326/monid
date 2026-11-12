@@ -55,6 +55,29 @@ export default defineProvider({
                 output: rest,
             };
         },
+        evidence: ({ data, utils }) => {
+            const model = data.usage.model;
+            if (model.kind !== "COMPOSITE") return { counts: {} };
+            const call = model.components.call;
+            const metered = model.components.metered;
+            if (call?.kind !== "PER_CALL" || metered?.kind !== "PER_UNIT") {
+                return { counts: {} };
+            }
+            const total = utils.json.optionalNum(
+                data.output,
+                "$.usage.total_cost_usd",
+            );
+            if (total === undefined) return { counts: {} };
+            const unit = metered.consumes.amount;
+            const units = Math.max(
+                0,
+                Math.round(total / unit) -
+                    Math.round(call.consumes.amount / unit),
+            );
+            const counts: Record<string, number> = {};
+            if (units > 0) counts.metered = units;
+            return { counts };
+        },
     },
     output: {
         fromError: ({ data, utils }) => {
@@ -65,8 +88,13 @@ export default defineProvider({
             const message = candidates.find((v) =>
                 typeof v === "string" && v !== ""
             );
+            const errorType = utils.json.optionalGet(
+                data.output,
+                "$.error_type",
+            );
             return {
                 message: typeof message === "string" ? message : "Tako error",
+                ...(typeof errorType === "string" ? { code: errorType } : {}),
                 raw: data.output,
             };
         },

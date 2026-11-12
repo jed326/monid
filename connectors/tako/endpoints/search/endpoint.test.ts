@@ -9,6 +9,11 @@ import {
     runEndpoint,
     testSealedUnit,
 } from "@shared/testing";
+import {
+    DATA_SOURCE_DESCRIPTION,
+    SOURCES_DESCRIPTION,
+    WEB_SOURCE_DESCRIPTION,
+} from "./schema/inputs.ts";
 
 const ID = "tako#v3/search";
 const chains = fromFileUrl(new URL("../../fixtures/", import.meta.url));
@@ -76,12 +81,27 @@ Deno.test("tako#v3/search estimate adds the deep premium, inlined rows, and a ca
 
     assertEquals(usage.evidence, {
         call: 1,
-        metered: 500 + 100_000 + 20 * 100 + 1_000 * 10,
+        metered: 500 + 100_000 + 5 * 100 + 5 * 50 * 160,
+    });
+});
+
+Deno.test("tako#v3/search estimate fills a caller's data source with the binding defaults", async () => {
+    const usage = await estimateEndpoint(await testSealedUnit(ID), {
+        body: {
+            query: "stripe.com monthly visits",
+            sources: { data: { include_contents: true } },
+        },
+    });
+
+    assertEquals(usage.evidence, {
+        call: 1,
+        metered: 25_000 + 5 * 100 + 5 * 20 * 160,
     });
 });
 
 Deno.test("tako#v3/search estimate caps inlined rows at the response budget", async () => {
-    const usage = await estimateEndpoint(await testSealedUnit(ID), {
+    const unit = await testSealedUnit(ID);
+    const fiveCards = await estimateEndpoint(unit, {
         body: {
             query: "US unemployment rate",
             sources: {
@@ -93,10 +113,27 @@ Deno.test("tako#v3/search estimate caps inlined rows at the response budget", as
             },
         },
     });
+    const twentyCards = await estimateEndpoint(unit, {
+        body: {
+            query: "US unemployment rate",
+            sources: {
+                data: {
+                    count: 20,
+                    include_contents: true,
+                    max_rows: 100_000,
+                    max_variable_cost_usd: 0,
+                },
+            },
+        },
+    });
 
-    assertEquals(usage.evidence, {
+    assertEquals(fiveCards.evidence, {
         call: 1,
-        metered: 20 * 100 + 2_400 * 10,
+        metered: 5 * 100 + (2_000 + 5 * 20) * 160,
+    });
+    assertEquals(twentyCards.evidence, {
+        call: 1,
+        metered: 20 * 100 + (2_000 + 20 * 20) * 160,
     });
 });
 
@@ -116,12 +153,14 @@ Deno.test("tako#v3/search estimate holds only the base price for a web-only sear
     assertEquals(zeroCap.evidence, { call: 1 });
 });
 
-Deno.test("tako#v3/search rejects variable_cost and zdr, which the connector doesn't expose", async () => {
+Deno.test("tako#v3/search rejects the fields the connector doesn't expose", async () => {
     const unit = await testSealedUnit(ID);
     const bodies: Json[] = [
         { query: "q", variable_cost: false },
         { query: "q", zdr: true },
         { query: "q", sources: { data: { variable_cost: false } } },
+        { query: "q", sources: { data: { mode: "inline" } } },
+        { query: "q", output_settings: { force_refresh: true } },
     ];
     for (const body of bodies) {
         await assertRejects(
@@ -164,6 +203,7 @@ Deno.test("tako#v3/search sends the binding defaults to Tako", async () => {
         effort: "fast",
         sources: {
             data: {
+                count: 5,
                 include_contents: false,
                 max_rows: 20,
                 max_variable_cost_usd: 0.25,
@@ -176,13 +216,20 @@ Deno.test("tako#v3/search sends the binding defaults to Tako", async () => {
 Deno.test("tako#v3/search keeps a caller's sources as sent, defaults filled in", async () => {
     assertEquals(
         await sentBody({
-            query: "stripe news",
-            sources: { web: { highlights: false } },
+            query: "stripe.com monthly visits",
+            sources: { data: { include_contents: true } },
         }),
         {
-            query: "stripe news",
+            query: "stripe.com monthly visits",
             effort: "fast",
-            sources: { web: { highlights: false } },
+            sources: {
+                data: {
+                    count: 5,
+                    include_contents: true,
+                    max_rows: 20,
+                    max_variable_cost_usd: 0.25,
+                },
+            },
         },
     );
 });
@@ -194,14 +241,22 @@ Deno.test("tako#v3/search compiled schema carries the binding defaults", async (
     };
     const sources = body.properties.sources as {
         default: unknown;
+        description?: string;
         properties: Record<
             string,
-            { properties: Record<string, { default?: unknown }> }
+            {
+                description?: string;
+                properties: Record<string, { default?: unknown }>;
+            }
         >;
     };
 
     assertEquals(body.properties.effort.default, "fast");
     assertEquals(sources.default, { data: {}, web: {} });
+    assertEquals(sources.description, SOURCES_DESCRIPTION);
+    assertEquals(sources.properties.data.description, DATA_SOURCE_DESCRIPTION);
+    assertEquals(sources.properties.web.description, WEB_SOURCE_DESCRIPTION);
+    assertEquals(sources.properties.data.properties.count.default, 5);
     assertEquals(
         sources.properties.data.properties.max_variable_cost_usd.default,
         0.25,

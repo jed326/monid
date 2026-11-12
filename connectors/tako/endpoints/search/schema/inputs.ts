@@ -10,10 +10,6 @@ export const zDataSourceSettings = z.object({
         "Inline each card's underlying data in the response, billed at the " +
             "tako#v1/contents rate: $0.001 per card plus a per-row rate.",
     ).optional(),
-    mode: z.enum(["url", "inline"]).describe(
-        "Delivery for inlined card data. Cards always inline on search; " +
-            "the field stays for schema stability.",
-    ).optional(),
     content_format: z.enum(["csv", "json_records", "json_compact", "card_json"])
         .describe(
             "Serialization for inlined card data: 'json_compact', " +
@@ -84,14 +80,20 @@ export const zWebSourceSettings = z.object({
     ).optional(),
 }).strict();
 
+export const DATA_SOURCE_DESCRIPTION =
+    "Tako data source: cards from Tako's knowledge graph. The search " +
+    "includes it only if present.";
+
+export const WEB_SOURCE_DESCRIPTION =
+    "Web source. The search includes it only if present.";
+
+export const SOURCES_DESCRIPTION =
+    "Per-source settings. The search includes a source only if its key " +
+    "is present.";
+
 export const zSources = z.object({
-    data: zDataSourceSettings.describe(
-        "Tako data source: cards from Tako's knowledge graph. The search " +
-            "includes it only if present.",
-    ).optional(),
-    web: zWebSourceSettings.describe(
-        "Web source. The search includes it only if present.",
-    ).optional(),
+    data: zDataSourceSettings.describe(DATA_SOURCE_DESCRIPTION).optional(),
+    web: zWebSourceSettings.describe(WEB_SOURCE_DESCRIPTION).optional(),
 }).strict();
 
 export const zGeoLocation = z.object({
@@ -117,7 +119,6 @@ export const zOutputSettings = z.object({
         "Whether to render card preview images in dark mode. Defaults to " +
             "true.",
     ).optional(),
-    force_refresh: z.boolean().optional(),
     flat_results: zFlatResultsSettings.describe(
         "Return cards and web results as one list, results, of one shape. " +
             "Send an object to turn the mode on; an empty object uses the " +
@@ -135,10 +136,7 @@ export const zSearchBody = z.object({
             "the results a second time; it's slower and costs $0.012 " +
             "instead of $0.007.",
     ).optional(),
-    sources: zSources.describe(
-        "Per-source settings. The search includes a source only if its key " +
-            "is present.",
-    ).optional(),
+    sources: zSources.describe(SOURCES_DESCRIPTION).optional(),
     location: zGeoLocation.describe(
         "Coordinates of the end user, for queries with an implicit " +
             "location such as weather.",

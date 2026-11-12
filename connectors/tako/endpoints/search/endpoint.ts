@@ -1,5 +1,8 @@
 import { defineEndpoint, Unit, UsageModelKind } from "@shared/core";
 import {
+    DATA_SOURCE_DESCRIPTION,
+    SOURCES_DESCRIPTION,
+    WEB_SOURCE_DESCRIPTION,
     zDataSourceSettings,
     zSearchBody,
     zSources,
@@ -8,6 +11,7 @@ import {
 
 const zDataSourceBinding = zDataSourceSettings.omit({ variable_cost: true })
     .extend({
+        count: zDataSourceSettings.shape.count.unwrap().default(5),
         include_contents: zDataSourceSettings.shape.include_contents.unwrap()
             .default(false),
         max_rows: zDataSourceSettings.shape.max_rows.unwrap().default(20)
@@ -72,6 +76,12 @@ export default defineEndpoint({
             "are free.",
             "Sending sources without a data key searches only the web, and " +
             "without a web key searches only data.",
+            "Tako rejects an empty sources object with a 400. Send at least " +
+            "one of data or web.",
+            "With sources.data.include_contents, the hold covers every " +
+            "card in sources.data.count at max_rows rows each, at the most " +
+            "Tako bills per row, $1.60 per 1,000 rows. Most cards bill far " +
+            "less.",
         ],
     },
     request: { method: "POST", path: "/v3/search" },
@@ -80,9 +90,14 @@ export default defineEndpoint({
             body: zSearchBody.omit({ variable_cost: true, zdr: true }).extend({
                 effort: zSearchBody.shape.effort.unwrap().default("fast"),
                 sources: zSources.extend({
-                    data: zDataSourceBinding.optional(),
-                    web: zWebSourceBinding.optional(),
-                }).prefault({ data: {}, web: {} }),
+                    data: zDataSourceBinding.describe(DATA_SOURCE_DESCRIPTION)
+                        .optional(),
+                    web: zWebSourceBinding.describe(WEB_SOURCE_DESCRIPTION)
+                        .optional(),
+                }).describe(SOURCES_DESCRIPTION).prefault({
+                    data: {},
+                    web: {},
+                }),
             }),
         },
     },
@@ -100,35 +115,44 @@ export default defineEndpoint({
                     kind: UsageModelKind.PER_UNIT,
                     unit: Unit.CREDIT,
                     consumes: { credit: "default", amount: 0.00001 },
-                    label: "usage above the base price, micro-cents",
+                    label: "usage above base price, $0.00001 units",
                     description: "the deep effort premium, inlined card " +
                         "data, and per-unit data such as website traffic",
                 },
             },
         },
         estimate: ({ data }) => {
+            const model = data.usage.model;
+            if (model.kind !== "COMPOSITE") return { counts: {} };
+            const metered = model.components.metered;
+            if (metered?.kind !== "PER_UNIT") return { counts: {} };
+            const unitsPerUsd = Math.round(1 / metered.consumes.amount);
+            const deepPremiumUsd = 0.005;
+            const inlinedCardUsd = 0.001;
+            const inlinedRowUsd = 0.0016;
+            const responseRowBudget = 2_000;
+            const rowFloorPerCard = 20;
             const body = data.input.body;
             const dataSource = body.sources.data;
-            const deepPremium = body.effort === "deep" ? 500 : 0;
+            const deepPremium = body.effort === "deep"
+                ? Math.round(deepPremiumUsd * unitsPerUsd)
+                : 0;
             const variableCost = dataSource === undefined
                 ? 0
-                : Math.ceil(dataSource.max_variable_cost_usd * 100_000);
-            const inlinedRows = dataSource === undefined ||
-                    !dataSource.include_contents
+                : Math.ceil(dataSource.max_variable_cost_usd * unitsPerUsd);
+            const inlined = dataSource?.include_contents
+                ? dataSource
+                : undefined;
+            const inlinedContents = inlined === undefined
                 ? 0
-                : 20 * 100 + Math.min(20 * dataSource.max_rows, 2_400) * 10;
-            const metered = deepPremium + variableCost + inlinedRows;
-            return { counts: metered > 0 ? { metered } : {} };
-        },
-        evidence: ({ data, utils }) => {
-            const total = utils.json.optionalNum(
-                data.output,
-                "$.usage.total_cost_usd",
-            );
-            const metered = total === undefined
-                ? 0
-                : Math.max(0, Math.round(total * 100_000) - 700);
-            return { counts: metered > 0 ? { metered } : {} };
+                : inlined.count * Math.round(inlinedCardUsd * unitsPerUsd) +
+                    Math.min(
+                            inlined.count * inlined.max_rows,
+                            responseRowBudget +
+                                rowFloorPerCard * inlined.count,
+                        ) * Math.round(inlinedRowUsd * unitsPerUsd);
+            const units = deepPremium + variableCost + inlinedContents;
+            return { counts: units > 0 ? { metered: units } : {} };
         },
     },
 });
