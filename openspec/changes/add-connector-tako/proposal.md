@@ -59,8 +59,9 @@ markets. No connector in the catalog searches structured statistics.
     highlights give better results, because the agent reads the
     snippet instead of fetching the page.
   - Search: `variable_cost` (both spellings) isn't exposed. Tako
-    rejects it next to a cap, and the cap always has a value; a cap of
-    0 serves every per-unit card as a placeholder.
+    rejects it next to a cap, and the cap always has a value. A cap of
+    0 pays nothing above the base price: Tako then serves data only for
+    the per-unit cards whose minimum price the base price covers.
   - Search: `sources.data.mode` and `output_settings.force_refresh`
     aren't exposed. Tako documents both as having no effect.
   - Search: Tako rejects `sources: {}` with a 400. The rule spans two

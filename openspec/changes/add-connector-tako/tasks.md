@@ -21,6 +21,11 @@
 - [x] 3.2 Tests: settle on the claim, estimates, wire bodies, schema
       gates, 401 and 422 as zero-billed data, live gated on
       `TAKO_API_KEY`
+- [x] 3.4 Live guards on the search hold, because evidence derives from
+      the claim and `usage.mismatch` can't catch drift: a search with
+      `include_contents` settles at or below its estimate, and every
+      card's `export_pricing` fits the $1.60 per 1,000 rows and $0.001
+      per card the hold assumes
 - [ ] 3.3 Replace the synthetic fixtures with `deno task record` runs
 
 ## 4. Wiring
